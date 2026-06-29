@@ -13,7 +13,12 @@ app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
 
-@app.route('/api/webhook', methods=['POST'])
+@app.route('/')
+def index():
+    return 'Trading T-Bot is running. Visit /setup to register webhook.', 200
+
+
+@app.route('/webhook', methods=['POST'])
 def webhook():
     """Telegram sends updates here."""
     try:
@@ -48,10 +53,10 @@ def webhook():
         return 'ok', 200
 
 
-@app.route('/api/setup', methods=['GET'])
+@app.route('/setup', methods=['GET'])
 def setup_webhook():
     """One-time: register this URL as the bot's webhook."""
-    url = request.host_url.rstrip('/') + '/api/webhook'
+    url = request.host_url.rstrip('/') + '/webhook'
     import requests
     resp = requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook",
