@@ -55,14 +55,33 @@ def webhook():
 
 @app.route('/setup', methods=['GET'])
 def setup_webhook():
-    """One-time: register this URL as the bot's webhook."""
-    url = request.host_url.rstrip('/') + '/webhook'
+    """One-time: register webhook URL + bot commands."""
     import requests
-    resp = requests.post(
-        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook",
-        json={"url": url, "drop_pending_updates": True}
-    )
-    return jsonify(resp.json())
+    bot_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+    host = request.host_url.rstrip('/')
+    
+    # 1. Set webhook
+    webhook_url = host + '/webhook'
+    r1 = requests.post(f"{bot_url}/setWebhook", json={
+        "url": webhook_url, "drop_pending_updates": True
+    })
+    
+    # 2. Register commands (so Telegram knows /t, /watchlist etc.)
+    r2 = requests.post(f"{bot_url}/setMyCommands", json={
+        "commands": [
+            {"command": "t", "description": "Analyze a ticker (e.g. /t NVDA)"},
+            {"command": "watchlist", "description": "Scan all watchlist stocks"},
+            {"command": "spy", "description": "Market sentiment (SPY+QQQ)"},
+            {"command": "help", "description": "Show help message"},
+        ]
+    })
+    
+    result = {
+        "webhook": r1.json(),
+        "commands": r2.json(),
+        "webhook_url": webhook_url,
+    }
+    return jsonify(result)
 
 
 def handle_command(cmd: str, args: list) -> str:
