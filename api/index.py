@@ -160,8 +160,14 @@ def webhook():
         
         elif cmd == '/t' and args:
             _send(chat_id, f"🔍 正在分析 **{args[0].upper()}**...")
-            reply = _analyze_fast(args[0])
-            _send(chat_id, reply)
+            try:
+                reply = _analyze_fast(args[0])
+                _send(chat_id, reply)
+            except Exception as e:
+                import traceback
+                tb = traceback.format_exc()
+                _send(chat_id, f"❌ 错误: {str(e)[:80]}\n`{tb[:200]}`")
+                logger.error(f"/t error: {tb}")
         
         elif cmd == '/watchlist':
             _send(chat_id, "📋 正在扫描自选股...")
