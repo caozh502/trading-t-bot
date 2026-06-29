@@ -3,6 +3,7 @@ Multi-factor scoring engine for intraday trading (做T) entry decisions.
 Combines technical indicators into a weighted score with clear signals.
 """
 
+from datetime import datetime, timezone
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
@@ -394,7 +395,6 @@ def analyze_ticker(ticker: str) -> AnalysisResult:
         info = t.info or {}
         result.company_name = str(info.get('shortName') or info.get('longName') or '')
         result.current_price = round(info.get('currentPrice') or info.get('regularMarketPrice') or 0, 2)
-        result.change_pct = round(info.get('regularMarketChangePercent', 0), 2) if info.get('regularMarketChangePercent') else 0
         
         # 2. Fetch intraday data for analysis
         df = fetch_intraday_data(ticker, interval='5m', period='5d')
@@ -406,6 +406,25 @@ def analyze_ticker(ticker: str) -> AnalysisResult:
         if df.empty:
             result.error = f"⚠️ 无法获取 {ticker} 的行情数据"
             return result
+        
+        # Calculate daily change from OHLCV data (more reliable than yfinance info)
+        if not df.empty and len(df) >= 2:
+            today = datetime.now(timezone.utc).date()
+            if df.index.tz is None:
+                df.index = df.index.tz_localize('UTC')
+            today_data = df[df.index.date == today]
+            prev_data = df[df.index.date < today]
+            if not today_data.empty:
+                day_open = today_data['Open'].iloc[0]
+                day_close = today_data['Close'].iloc[-1]
+                if day_open and day_open != 0:
+                    result.change_pct = round((day_close - day_open) / day_open * 100, 2)
+            elif not prev_data.empty:
+                # Pre-market: compare to previous close
+                prev_close = prev_data['Close'].iloc[-1]
+                current_price = result.current_price if result.current_price > 0 else df['Close'].iloc[-1]
+                if prev_close:
+                    result.change_pct = round((current_price - prev_close) / prev_close * 100, 2)
         
         # 3. Calculate all indicators
         vwap = calc_session_vwap(df)
