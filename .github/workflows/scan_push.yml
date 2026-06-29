@@ -1,0 +1,30 @@
+name: Trading 做T Scan Push
+
+on:
+  schedule:
+    # 美东 10:00 = UTC 14:00（夏令时）
+    - cron: '0 14 * * 1-5'
+    # 美东 15:00 = UTC 19:00
+    - cron: '0 19 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance pandas numpy python-telegram-bot python-dotenv requests
+
+      - name: Run scan & push
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: python gh_scan_push.py
