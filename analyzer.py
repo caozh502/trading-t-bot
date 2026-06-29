@@ -394,7 +394,7 @@ def analyze_ticker(ticker: str) -> AnalysisResult:
         info = t.info or {}
         result.company_name = str(info.get('shortName') or info.get('longName') or '')
         result.current_price = round(info.get('currentPrice') or info.get('regularMarketPrice') or 0, 2)
-        result.change_pct = round(info.get('regularMarketChangePercent', 0) * 100, 2) if info.get('regularMarketChangePercent') else 0
+        result.change_pct = round(info.get('regularMarketChangePercent', 0), 2) if info.get('regularMarketChangePercent') else 0
         
         # 2. Fetch intraday data for analysis
         df = fetch_intraday_data(ticker, interval='5m', period='5d')
