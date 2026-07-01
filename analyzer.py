@@ -513,6 +513,18 @@ def format_result(result: AnalysisResult, verbose: bool = True) -> str:
     lines.append(f"**评分: {result.total_score:+.2f}** → {result.signal}")
     lines.append("")
     
+    # ── 三级信号共振检测 ────────────────────────────────────
+    volume_ratio_high = any(
+        f.name == '成交量确认' and f.score >= 0.8
+        for f in result.factors
+    )
+    if (result.total_score >= 0.4
+            and result.sl_tp.get('rr_ratio', 0) >= 2.0
+            and volume_ratio_high):
+        lines.append("🔥🔥 **三级信号共振 — 适合上仓位！** 🔥🔥")
+        lines.append("   🟢 综合评分≥0.4 | ⭐ 盈亏比≥2.0 | 📊 放量1.5x+")
+        lines.append("")
+    
     # Factor breakdown
     for f in result.factors:
         bar = _score_bar(f.score)

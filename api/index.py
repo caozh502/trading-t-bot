@@ -77,10 +77,19 @@ def _analyze_fast(ticker: str) -> str:
     signal = "✅ 适合入场" if score >= 0.4 else "🟡 谨慎入场" if score >= 0.2 else "⚪ 观望为宜"
     emoji = "🟢" if score >= 0.4 else "🟡" if score >= 0.2 else "⚪"
     
+    # ── 三级信号共振检测 ────────────────────────────────────
+    triple_banner = ""
+    if score >= 0.4 and sl_tp['rr'] >= 2.0 and vol is not None and vol >= 1.5:
+        triple_banner = (
+            "\n🔥🔥 **三级信号共振 — 适合上仓位！** 🔥🔥\n"
+            "   🟢 综合评分≥0.4 | ⭐ 盈亏比≥2.0 | 📊 放量1.5x+\n\n"
+        )
+    
     return (
         f"{emoji} **{ticker}** - {company}\n"
         f"`${current_price:.2f}` {change_pct:+.2f}%\n"
         f"**评分: {score:+.2f}** → {signal}\n\n"
+        f"{triple_banner}"
         f"🎯 **做T计划** 📈\n"
         f"   止损: **${sl_tp['sl']:.2f}** ({sl_tp['sl_pct']:+.2f}%)\n"
         f"   止盈: **${sl_tp['tp']:.2f}** ({sl_tp['tp_pct']:+.2f}%)\n"

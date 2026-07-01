@@ -7,7 +7,7 @@ import os, sys, requests
 from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(__file__))
 from config import DEFAULT_WATCHLIST, TICKER_PARAMS, DEFAULT_SL_PCT, DEFAULT_TP_PCT
-from indicators import calc_rsi, calc_ema
+from indicators import calc_rsi, calc_ema, calc_volume_ratio
 
 results = []
 
@@ -69,9 +69,16 @@ for ticker in DEFAULT_WATCHLIST:
         tp_pct = TICKER_PARAMS.get(ticker, {}).get('tp_pct', DEFAULT_TP_PCT)
         sl_price = current_price * (1 - sl_pct/100)
         tp_price = current_price * (1 + tp_pct/100)
+        rr_ratio = round(tp_pct / sl_pct, 2) if sl_pct else 1.0
+        
+        # ── 三级信号共振检测 ────────────────────────────────────
+        vol_ratio = calc_volume_ratio(df)
+        triple_tag = ""
+        if score >= 0.4 and rr_ratio >= 2.0 and vol_ratio >= 1.5:
+            triple_tag = " 🔥🔥共振"
         
         lines = (
-            f"{emoji} {ticker:5s} {ext_label} | ${current_price:<7.2f} {change_pct:+.2f}%"
+            f"{emoji} {ticker:5s} {ext_label}{triple_tag} | ${current_price:<7.2f} {change_pct:+.2f}%"
             f" | 评分{score:+.2f} {signal}"
         )
         results.append(lines)
