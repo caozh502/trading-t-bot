@@ -196,6 +196,25 @@ def webhook():
             qp = qqq['Close'].iloc[-1] if not qqq.empty else 0
             _send(chat_id, f"📊 **大盘情绪**\n{s.get('description','')}\n\nSPY ${sp:.2f} ({s.get('spy_change',0):+.2f}%)\nQQQ ${qp:.2f} ({s.get('qqq_change',0):+.2f}%)")
         
+        elif cmd == '/strategy':
+            _send(chat_id, (
+                "📖 **10k€ 做T策略手册**\n\n"
+                "⏰ **时间窗口 (CEST)**\n"
+                "15:30-16:00 开盘冲高\n"
+                "16:00-17:30 趋势确立\n"
+                "17:30-20:00 午盘减少操作\n"
+                "20:00-22:00 尾盘收盘前平仓\n\n"
+                "📈 **策略1: VWAP回归** 15:30-16:00\n"
+                "开盘偏离VWAP≥1.5%→回归，止损反方向1.5%\n\n"
+                "🎯 **策略2: 支撑挂单** 16:00-17:30\n"
+                "🟢信号+S1下方0.5%限价买入，TP 1.5-2.0%\n\n"
+                "🚀 **策略3: 尾盘趋势** 20:30-21:30\n"
+                "强股回调EMA入场，21:59前平仓\n\n"
+                "⚡ **三级共振上大仓位:**\n"
+                "🟢评分≥0.4 + ⭐盈亏比≥2.0 + 📊放量≥1.5x\n\n"
+                "📋 纪律: 日≤3笔, 连亏停30min, 无杠杆不过夜"
+            ))
+        
         else:
             _send(chat_id, "⚠️ 未知命令。发送 `/help` 查看可用命令。")
         
@@ -221,6 +240,7 @@ def setup_webhook():
         {"command": "t", "description": "Analyze a ticker (e.g. /t NVDA)"},
         {"command": "watchlist", "description": "Scan all watchlist stocks"},
         {"command": "spy", "description": "Market sentiment (SPY+QQQ)"},
+        {"command": "strategy", "description": "做T策略手册 (时间/仓位/纪律)"},
         {"command": "help", "description": "Show help message"},
     ]})
     return jsonify({"webhook": r1.json(), "commands": r2.json()})

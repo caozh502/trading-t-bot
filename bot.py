@@ -27,6 +27,69 @@ from config import (
     TELEGRAM_BOT_TOKEN, DEFAULT_WATCHLIST, VERBOSE_DEFAULT
 )
 
+STRATEGY_TEXT = """\
+📖 **10k€ 做T策略手册** (`/strategy`)
+
+━━━━━━━━━━━━━━━━━━━
+**⏰ 时间窗口 (CEST)**
+━━━━━━━━━━━━━━━━━━━
+15:30-16:00 开盘冲高 — 波动最大
+16:00-17:30 趋势确立 — Bot信号最准
+17:30-20:00 午盘震荡 — 减少操作
+20:00-22:00 尾盘动量 — 收盘前平仓
+
+━━━━━━━━━━━━━━━━━━━
+**💰 仓位管理 (10k€)**
+━━━━━━━━━━━━━━━━━━━
+保守 1,500-2,000€ | 1笔
+中等 2,500-3,000€ | 2笔
+激进 4,000-5,000€ | 1笔
+*单笔亏损 ≤ 1% 总资金 (100€)*
+
+━━━━━━━━━━━━━━━━━━━
+**📈 策略1: 开盘VWAP回归**
+━━━━━━━━━━━━━━━━━━━
+⏱ 15:30-16:00
+开盘5分K后，价格偏离VWAP≥1.5%
+→ 做回归VWAP，15-30分钟平仓
+止损: 入场反方向1.5%
+标的: QQQ / NVDA / SPY
+
+━━━━━━━━━━━━━━━━━━━
+**🎯 策略2: Bot信号→支撑挂单**
+━━━━━━━━━━━━━━━━━━━
+⏱ 16:00-17:30
+Bot出🟢信号(评分≥0.4)
+在S1下方0.5%挂Limit Buy
+止盈: Bot的TP (1.5-2.0%)
+止损: S1下方0.5-1%
+
+━━━━━━━━━━━━━━━━━━━
+**🚀 策略3: 尾盘趋势跟进**
+━━━━━━━━━━━━━━━━━━━
+⏱ 20:30-21:30
+选日内涨幅2-5%的强势股
+回调EMA5/EMA20入场做多
+*必须收盘前平仓* (21:59前)
+止损: 入场EMA下方1%
+
+━━━━━━━━━━━━━━━━━━━
+**⚡ 三级共振条件**
+━━━━━━━━━━━━━━━━━━━
+同时满足时才上大仓位:
+🟢 综合评分≥0.4
+⭐ 盈亏比≥2.0
+📊 放量≥1.5x
+
+━━━━━━━━━━━━━━━━━━━
+**📋 交易纪律**
+━━━━━━━━━━━━━━━━━━━
+• 一天最多3笔，做完停手
+• 连亏2笔 → 强制休息30分钟
+• 不用杠杆，不过夜
+• 一次只盯1-2个标的
+• 只在🟢信号上大仓位"""
+
 # ── Logging ──────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -47,6 +110,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "`/t <代码>` — 分析单只股票\n"
         "`/watchlist` — 扫描自选股\n"
         "`/spy` — 大盘情绪\n"
+        "`/strategy` — 做T策略手册\n"
         "`/help` — 帮助\n\n"
         "例: `/t AAPL`",
         parse_mode="Markdown"
@@ -181,6 +245,14 @@ async def cmd_spy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(f"❌ 获取大盘数据出错: {str(e)[:200]}")
 
 
+async def cmd_strategy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show trading strategy reference."""
+    await update.message.reply_text(
+        STRATEGY_TEXT,
+        parse_mode="Markdown"
+    )
+
+
 # ── Stop command ─────────────────────────────────────────────
 
 async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -236,10 +308,11 @@ def main():
     app.add_handler(CommandHandler("t", cmd_t))
     app.add_handler(CommandHandler("watchlist", cmd_watchlist))
     app.add_handler(CommandHandler("spy", cmd_spy))
+    app.add_handler(CommandHandler("strategy", cmd_strategy))
     app.add_handler(CommandHandler("stop", cmd_stop))
     app.add_error_handler(error_handler)
     
-    logger.info("✅ Bot started! Commands: /t <ticker>, /watchlist, /spy, /stop")
+    logger.info("✅ Bot started! Commands: /t <ticker>, /watchlist, /spy, /strategy, /stop")
     
     # Start polling
     app.run_polling(allowed_updates=Update.ALL_TYPES)
