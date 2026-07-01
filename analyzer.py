@@ -567,27 +567,25 @@ def _score_bar(score: float, width: int = 10) -> str:
 
 
 def _detect_market_session(df) -> str:
-    """Detect whether the last data point is pre-market, regular, or after-hours."""
-    if df is None or df.empty:
-        return ""
+    """Detect current market session based on current ET time."""
+    from datetime import datetime, timezone
     try:
-        from datetime import timezone
-        last = df.index[-1]
-        if last.tzinfo is None:
-            last = last.tz_localize('UTC')
-        # Convert to ET (simplified: UTC-4 for EDT)
-        et = last.tz_convert('America/New_York') if hasattr(last, 'tz_convert') else last
-        h = et.hour
-        m = et.minute
-        total_min = h * 60 + m
-        # ET market hours
-        if total_min < 4 * 60:  # 0:00-4:00 = closed
+        now_utc = datetime.now(timezone.utc)
+        # Convert to ET
+        et = now_utc.astimezone()
+        # Manual ET offset: June = EDT = UTC-4
+        # Simple approach: subtract 4 hours from UTC
+        et_minutes = now_utc.hour * 60 + now_utc.minute - 4 * 60
+        if et_minutes < 0:
+            et_minutes += 24 * 60
+        
+        if et_minutes < 4 * 60:  # 0:00-4:00 ET
             return "🌙 盘后"
-        elif total_min < 9 * 60 + 30:  # 4:00-9:30 = pre-market
+        elif et_minutes < 9 * 60 + 30:  # 4:00-9:30 ET
             return "🌅 盘前"
-        elif total_min < 16 * 60:  # 9:30-16:00 = regular
+        elif et_minutes < 16 * 60:  # 9:30-16:00 ET
             return "📊 盘中"
-        else:  # 16:00-24:00 = after-hours
+        else:  # 16:00-24:00 ET
             return "🌙 盘后"
     except Exception:
         return ""
