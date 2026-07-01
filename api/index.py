@@ -165,7 +165,19 @@ def webhook():
         
         # Handle commands
         if cmd in ('/start', '/help'):
-            _send(chat_id, "🤖 **做T信号分析 Bot**\n\n`/t <代码>` — 分析\n`/watchlist` — 自选股\n`/spy` — 大盘\n\n例: `/t NVDA`")
+            _send(chat_id, (
+                "🤖 **做T信号分析 Bot** — 命令菜单\n\n"
+                "📊 **数据分析**\n"
+                "/t <代码> — 分析单只股票\n"
+                "/watchlist — 扫描全部自选股\n"
+                "/spy — 大盘情绪\n\n"
+                "📖 **参考手册**\n"
+                "/strategy — 10k€做T策略手册\n"
+                "/menu — 显示此菜单\n\n"
+                "⚙️ 管理\n"
+                "/stop — 关闭Bot\n\n"
+                "例: /t NVDA"
+            ))
         
         elif cmd == '/t' and args:
             _send(chat_id, f"🔍 正在分析 **{args[0].upper()}**...")
@@ -215,6 +227,21 @@ def webhook():
                 "📋 纪律: 日≤3笔, 连亏停30min, 无杠杆不过夜"
             ))
         
+        elif cmd == '/menu':
+            _send(chat_id, (
+                "🤖 **做T信号分析 Bot** — 命令菜单\n\n"
+                "📊 **数据分析**\n"
+                "/t <代码> — 分析单只股票\n"
+                "/watchlist — 扫描全部自选股\n"
+                "/spy — 大盘情绪\n\n"
+                "📖 **参考手册**\n"
+                "/strategy — 10k€做T策略手册\n"
+                "/menu — 显示此菜单\n\n"
+                "⚙️ 管理\n"
+                "/stop — 关闭Bot\n\n"
+                "例: /t NVDA"
+            ))
+        
         else:
             _send(chat_id, "⚠️ 未知命令。发送 `/help` 查看可用命令。")
         
@@ -241,6 +268,7 @@ def setup_webhook():
         {"command": "watchlist", "description": "Scan all watchlist stocks"},
         {"command": "spy", "description": "Market sentiment (SPY+QQQ)"},
         {"command": "strategy", "description": "做T策略手册 (时间/仓位/纪律)"},
+        {"command": "menu", "description": "Show all commands"},
         {"command": "help", "description": "Show help message"},
     ]})
     return jsonify({"webhook": r1.json(), "commands": r2.json()})

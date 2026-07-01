@@ -90,6 +90,30 @@ Bot出🟢信号(评分≥0.4)
 • 一次只盯1-2个标的
 • 只在🟢信号上大仓位"""
 
+MENU_TEXT = """\
+🤖 **做T信号分析 Bot** — 命令菜单
+
+━━━━━━━━━━━━━━━━━━━
+**📊 数据分析**
+━━━━━━━━━━━━━━━━━━━
+`/t <代码>` — 分析单只股票 (例: /t NVDA)
+`/watchlist` — 扫描全部自选股
+`/spy` — 大盘情绪 (SPY+QQQ)
+
+━━━━━━━━━━━━━━━━━━━
+**📖 参考手册**
+━━━━━━━━━━━━━━━━━━━
+`/strategy` — 10k€做T策略手册
+`/menu` — 显示此命令菜单
+`/help` — 帮助信息
+
+━━━━━━━━━━━━━━━━━━━
+**⚙️ 管理**
+━━━━━━━━━━━━━━━━━━━
+`/stop` — 关闭Bot
+
+💡 *发 /t QQ 就会自动补全为 /t QQQ*"""
+
 # ── Logging ──────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -106,13 +130,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🤖 **做T信号分析 Bot**\n\n"
         "快速判断美股是否适合日内入场做T。\n\n"
-        "**命令:**\n"
-        "`/t <代码>` — 分析单只股票\n"
-        "`/watchlist` — 扫描自选股\n"
-        "`/spy` — 大盘情绪\n"
-        "`/strategy` — 做T策略手册\n"
-        "`/help` — 帮助\n\n"
-        "例: `/t AAPL`",
+        "发送 `/menu` 查看所有命令。\n\n"
+        "例: `/t NVDA`",
         parse_mode="Markdown"
     )
 
@@ -253,6 +272,14 @@ async def cmd_strategy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show menu of all commands."""
+    await update.message.reply_text(
+        MENU_TEXT,
+        parse_mode="Markdown"
+    )
+
+
 # ── Stop command ─────────────────────────────────────────────
 
 async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -309,10 +336,11 @@ def main():
     app.add_handler(CommandHandler("watchlist", cmd_watchlist))
     app.add_handler(CommandHandler("spy", cmd_spy))
     app.add_handler(CommandHandler("strategy", cmd_strategy))
+    app.add_handler(CommandHandler("menu", cmd_menu))
     app.add_handler(CommandHandler("stop", cmd_stop))
     app.add_error_handler(error_handler)
     
-    logger.info("✅ Bot started! Commands: /t <ticker>, /watchlist, /spy, /strategy, /stop")
+    logger.info("✅ Bot started! Commands: /t <ticker>, /watchlist, /spy, /strategy, /menu, /stop")
     
     # Start polling
     app.run_polling(allowed_updates=Update.ALL_TYPES)
