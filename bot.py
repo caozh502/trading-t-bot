@@ -327,7 +327,18 @@ def main():
     
     logger.info("🤖 做T信号分析 Bot 启动中...")
     
-    app = Application.builder().token(token).build()
+    # Register bot command list for Telegram autocomplete
+    async def post_init(application):
+        await application.bot.set_my_commands([
+            ("t", "Analyze a ticker (e.g. /t NVDA)"),
+            ("watchlist", "Scan all watchlist stocks"),
+            ("spy", "Market sentiment (SPY+QQQ)"),
+            ("strategy", "做T策略手册"),
+            ("menu", "Show all commands"),
+            ("help", "Show help message"),
+        ])
+    
+    app = Application.builder().token(token).post_init(post_init).build()
     
     # Register commands
     app.add_handler(CommandHandler("start", cmd_start))
