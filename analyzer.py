@@ -53,6 +53,7 @@ class AnalysisResult:
     support_resistance: dict = field(default_factory=dict)
     bollinger: dict = field(default_factory=dict)
     sl_tp: dict = field(default_factory=dict)  # stop-loss & take-profit
+    market_session: str = ""  # 盘前 | 盘中 | 盘后 | 休市
     error: Optional[str] = None
 
 
@@ -426,6 +427,9 @@ def analyze_ticker(ticker: str) -> AnalysisResult:
                 if prev_close:
                     result.change_pct = round((current_price - prev_close) / prev_close * 100, 2)
         
+        # Detect market session (pre-market / regular / after-hours)
+        result.market_session = _detect_market_session(df)
+        
         # 3. Calculate all indicators
         vwap = calc_session_vwap(df)
         trend_info = detect_trend(df)
@@ -497,6 +501,8 @@ def format_result(result: AnalysisResult, verbose: bool = True) -> str:
         f"{' - ' + result.company_name if result.company_name else ''}"
     )
     lines.append(f"`${result.current_price:.2f}` {change_str}")
+    if result.market_session:
+        lines.append(f"⏰ {result.market_session}")
     lines.append(f"**评分: {result.total_score:+.2f}** → {result.signal}")
     lines.append("")
     
@@ -558,6 +564,33 @@ def _score_bar(score: float, width: int = 10) -> str:
         return "🟢" + "█" * filled + "░" * empty
     else:
         return "🔴" + "█" * filled + "░" * empty
+
+
+def _detect_market_session(df) -> str:
+    """Detect whether the last data point is pre-market, regular, or after-hours."""
+    if df is None or df.empty:
+        return ""
+    try:
+        from datetime import timezone
+        last = df.index[-1]
+        if last.tzinfo is None:
+            last = last.tz_localize('UTC')
+        # Convert to ET (simplified: UTC-4 for EDT)
+        et = last.tz_convert('America/New_York') if hasattr(last, 'tz_convert') else last
+        h = et.hour
+        m = et.minute
+        total_min = h * 60 + m
+        # ET market hours
+        if total_min < 4 * 60:  # 0:00-4:00 = closed
+            return "🌙 盘后"
+        elif total_min < 9 * 60 + 30:  # 4:00-9:30 = pre-market
+            return "🌅 盘前"
+        elif total_min < 16 * 60:  # 9:30-16:00 = regular
+            return "📊 盘中"
+        else:  # 16:00-24:00 = after-hours
+            return "🌙 盘后"
+    except Exception:
+        return ""
 
 
 if __name__ == '__main__':
