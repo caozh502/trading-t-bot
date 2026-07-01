@@ -37,6 +37,59 @@ def fetch_intraday_data(ticker: str, interval: str = "5m", period: str = "5d") -
         return pd.DataFrame()
 
 
+def fetch_current_price(ticker: str) -> dict:
+    """
+    Fetch the most recent price including extended hours (pre/post market).
+    Returns dict with price, change_pct, and source label.
+    Falls back to regular market price if extended hours unavailable.
+    """
+    import yfinance as yf
+    result = {"price": 0, "change_pct": 0, "source": ""}
+    try:
+        t = yf.Ticker(ticker)
+        # Try with extended hours first
+        df = t.history(period="2d", interval="5m", prepost=True)
+        if df.empty:
+            # Fallback to regular hours
+            df = t.history(period="2d", interval="5m")
+        if df.empty:
+            # Last resort: info
+            info = t.info or {}
+            result["price"] = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+            return result
+        
+        if isinstance(df.columns, type(df.columns)) and hasattr(df.columns, 'get_level_values'):
+            df.columns = df.columns.get_level_values(0)
+        
+        # Most recent price
+        last = df.iloc[-1]
+        result["price"] = round(float(last["Close"]), 2)
+        
+        # Previous close for change calculation
+        info = t.info or {}
+        prev_close = info.get("regularMarketPreviousClose", 0)
+        if prev_close:
+            result["change_pct"] = round((result["price"] - prev_close) / prev_close * 100, 2)
+        
+        # Determine source
+        from datetime import timezone
+        last_time = df.index[-1]
+        if last_time.tzinfo is None:
+            last_time = last_time.tz_localize("UTC")
+        et_minutes = last_time.hour * 60 + last_time.minute - 4 * 60  # EDT offset
+        if et_minutes < 0:
+            et_minutes += 24 * 60
+        if et_minutes < 9 * 60 + 30 or et_minutes >= 16 * 60:
+            result["source"] = "ext"
+        else:
+            result["source"] = "regular"
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching extended price for {ticker}: {e}")
+        return result
+
+
 def calc_vwap(df: pd.DataFrame) -> float:
     """
     Calculate Volume-Weighted Average Price from intraday data.

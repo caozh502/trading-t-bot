@@ -10,7 +10,7 @@ from typing import Optional
 import yfinance as yf
 
 from indicators import (
-    fetch_intraday_data, calc_session_vwap, calc_rsi, detect_trend,
+    fetch_intraday_data, fetch_current_price, calc_session_vwap, calc_rsi, detect_trend,
     calc_support_resistance, calc_volume_ratio, calc_bollinger_bands,
     get_market_sentiment
 )
@@ -468,7 +468,14 @@ def analyze_ticker(ticker: str) -> AnalysisResult:
         result.bollinger = bb
         result.market_sentiment = sentiment
         
-        # 7. Calculate stop-loss / take-profit levels
+        # 7. Update price with extended hours (pre/post market) if available
+        ext_price = fetch_current_price(ticker)
+        if ext_price["price"] > 0:
+            current_price = ext_price["price"]
+            result.current_price = ext_price["price"]
+            result.change_pct = ext_price["change_pct"]
+        
+        # 8. Calculate stop-loss / take-profit levels
         result.sl_tp = calc_sl_tp(
             current_price, vwap, sr, bb,
             trend_info.get('direction', 'neutral'),
