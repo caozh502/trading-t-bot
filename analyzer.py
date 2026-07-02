@@ -12,7 +12,7 @@ import yfinance as yf
 from indicators import (
     fetch_intraday_data, fetch_current_price, calc_session_vwap, calc_rsi, detect_trend,
     calc_support_resistance, calc_volume_ratio, calc_bollinger_bands,
-    get_market_sentiment
+    get_market_sentiment, detect_market_session
 )
 from config import TICKER_PARAMS, DEFAULT_SL_PCT, DEFAULT_TP_PCT
 
@@ -428,7 +428,7 @@ def analyze_ticker(ticker: str) -> AnalysisResult:
                     result.change_pct = round((current_price - prev_close) / prev_close * 100, 2)
         
         # Detect market session (pre-market / regular / after-hours)
-        result.market_session = _detect_market_session(df)
+        result.market_session = detect_market_session(df)
         
         # 3. Calculate all indicators
         vwap = calc_session_vwap(df)
@@ -583,31 +583,6 @@ def _score_bar(score: float, width: int = 10) -> str:
         return "🟢" + "█" * filled + "░" * empty
     else:
         return "🔴" + "█" * filled + "░" * empty
-
-
-def _detect_market_session(df) -> str:
-    """Detect current market session based on current ET time."""
-    from datetime import datetime, timezone
-    try:
-        now_utc = datetime.now(timezone.utc)
-        # Convert to ET
-        et = now_utc.astimezone()
-        # Manual ET offset: June = EDT = UTC-4
-        # Simple approach: subtract 4 hours from UTC
-        et_minutes = now_utc.hour * 60 + now_utc.minute - 4 * 60
-        if et_minutes < 0:
-            et_minutes += 24 * 60
-        
-        if et_minutes < 4 * 60:  # 0:00-4:00 ET
-            return "🌙 盘后"
-        elif et_minutes < 9 * 60 + 30:  # 4:00-9:30 ET
-            return "🌅 盘前"
-        elif et_minutes < 16 * 60:  # 9:30-16:00 ET
-            return "📊 盘中"
-        else:  # 16:00-24:00 ET
-            return "🌙 盘后"
-    except Exception:
-        return ""
 
 
 if __name__ == '__main__':

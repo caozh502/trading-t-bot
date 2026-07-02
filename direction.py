@@ -10,9 +10,10 @@ import yfinance as yf
 import pandas as pd
 
 from indicators import (
-    fetch_intraday_data, calc_rsi, detect_trend, calc_macd,
+    fetch_intraday_data, fetch_current_price, calc_rsi, detect_trend, calc_macd,
     calc_fibonacci_levels, calc_bollinger_bands, calc_session_vwap,
-    calc_volume_ratio, calc_support_resistance, get_market_sentiment
+    calc_volume_ratio, calc_support_resistance, get_market_sentiment,
+    detect_market_session
 )
 from config import TICKER_PARAMS
 
@@ -33,6 +34,7 @@ class DirectionResult:
     buy_limit: str = ""      # 挂单建议
     take_profit: str = ""    # 止盈建议
     stop_loss: str = ""      # 止损建议
+    market_session: str = "" # 盘前/盘中/盘后
     details: dict = field(default_factory=dict)
     error: Optional[str] = None
 
@@ -57,6 +59,15 @@ def analyze_direction(ticker: str) -> DirectionResult:
         if df.empty:
             result.error = f"⚠️ 无法获取 {ticker} 行情数据"
             return result
+        
+        # Update price with extended hours (pre/post market) if available
+        ext = fetch_current_price(ticker)
+        if ext["price"] > 0:
+            result.current_price = ext["price"]
+            result.change_pct = ext["change_pct"]
+        
+        # Detect market session
+        result.market_session = detect_market_session(df)
         
         # Calculate all indicators
         close = df['Close']
@@ -341,7 +352,10 @@ def format_direction_result(r: DirectionResult) -> str:
     
     # Header
     lines.append(f"{emoji_dir} **{r.ticker}** - {r.company_name}")
-    lines.append(f"`${r.current_price:.2f}` {r.change_pct:+.2f}%")
+    change_str = f"{r.change_pct:+.2f}%" if r.change_pct else ""
+    lines.append(f"`${r.current_price:.2f}` {change_str}")
+    if r.market_session:
+        lines.append(f"⏰ {r.market_session}")
     lines.append("")
     
     # Scores

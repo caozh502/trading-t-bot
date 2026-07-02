@@ -514,6 +514,26 @@ def calc_fibonacci_levels(df: pd.DataFrame, lookback: int = 60) -> dict:
     }
 
 
+def detect_market_session(df=None) -> str:
+    """Detect current market session based on current ET time."""
+    from datetime import datetime, timezone
+    try:
+        now_utc = datetime.now(timezone.utc)
+        et_minutes = now_utc.hour * 60 + now_utc.minute - 4 * 60  # EDT
+        if et_minutes < 0:
+            et_minutes += 24 * 60
+        if et_minutes < 4 * 60:
+            return "🌙 盘后"
+        elif et_minutes < 9 * 60 + 30:
+            return "🌅 盘前"
+        elif et_minutes < 16 * 60:
+            return "📊 盘中"
+        else:
+            return "🌙 盘后"
+    except Exception:
+        return ""
+
+
 if __name__ == '__main__':
     # Quick test
     df = fetch_intraday_data('AAPL')
