@@ -396,6 +396,124 @@ def get_market_sentiment() -> dict:
         return {'direction': 'unknown', 'description': '无法获取', 'spy_change': 0, 'qqq_change': 0}
 
 
+def calc_macd(close: pd.Series, fast: int = 12, slow: int = 26, signal_period: int = 9) -> dict:
+    """
+    Calculate MACD (Moving Average Convergence Divergence).
+    
+    Returns:
+        macd: MACD line (fast EMA - slow EMA)
+        signal: Signal line (EMA of MACD)
+        histogram: MACD - Signal
+        cross: 'bullish' (macd crossed above signal), 'bearish', or 'none'
+    """
+    if len(close) < slow + signal_period:
+        return {'macd': 0, 'signal': 0, 'histogram': 0, 'cross': 'none'}
+    
+    ema_fast = close.ewm(span=fast, adjust=False).mean()
+    ema_slow = close.ewm(span=slow, adjust=False).mean()
+    
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal_period, adjust=False).mean()
+    histogram = macd_line - signal_line
+    
+    # Detect cross
+    macd_curr = macd_line.iloc[-1]
+    signal_curr = signal_line.iloc[-1]
+    macd_prev = macd_line.iloc[-2] if len(macd_line) >= 2 else macd_curr
+    signal_prev = signal_line.iloc[-2] if len(signal_line) >= 2 else signal_curr
+    
+    if macd_prev <= signal_prev and macd_curr > signal_curr:
+        cross = 'bullish'
+    elif macd_prev >= signal_prev and macd_curr < signal_curr:
+        cross = 'bearish'
+    else:
+        cross = 'none'
+    
+    return {
+        'macd': round(macd_curr, 4),
+        'signal': round(signal_curr, 4),
+        'histogram': round(histogram.iloc[-1], 4),
+        'cross': cross,
+        'histogram_dir': 'rising' if histogram.iloc[-1] > histogram.iloc[-2] else 'falling',
+    }
+
+
+def calc_fibonacci_levels(df: pd.DataFrame, lookback: int = 60) -> dict:
+    """
+    Calculate Fibonacci retracement and extension levels from recent swing high/low.
+    
+    Args:
+        df: DataFrame with High/Low columns
+        lookback: Number of bars to look back for swing points
+    
+    Returns:
+        dict with high, low, and retracement/extension levels
+    """
+    if df.empty or len(df) < lookback:
+        return {'high': 0, 'low': 0, 'levels': {}, 'current_zone': ''}
+    
+    recent = df.tail(lookback)
+    high = recent['High'].max()
+    low = recent['Low'].min()
+    diff = high - low
+    
+    if diff == 0:
+        return {'high': high, 'low': low, 'levels': {}, 'current_zone': ''}
+    
+    # Downward retracement (from high to low): levels above current
+    # Upward retracement (from low to high): levels below current
+    # Determine trend direction
+    first_close = recent['Close'].iloc[0]
+    last_close = recent['Close'].iloc[-1]
+    uptrend = last_close > first_close
+    
+    if uptrend:
+        swing_high = high
+        swing_low = low
+    else:
+        swing_high = high  # actually the high of the range
+        swing_low = low    # actually the low of the range
+    
+    ratios = [0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.414, 1.618]
+    levels = {}
+    
+    for r in ratios:
+        if uptrend:
+            # Retracement down from high, extension up from high
+            level = swing_high - (swing_high - swing_low) * r
+            label = f"{'支' if r <= 1.0 else '延'}{r:.3f}"
+        else:
+            # Retracement up from low, extension down from low
+            level = swing_low + (swing_high - swing_low) * r
+            label = f"{'阻' if r <= 1.0 else '延'}{r:.3f}"
+        levels[label] = round(level, 2)
+    
+    # Determine current zone
+    current_price = last_close
+    zone = ""
+    sorted_levels = sorted(levels.items(), key=lambda x: x[1])
+    for i, (label, level) in enumerate(sorted_levels):
+        if i == 0 and current_price < level:
+            zone = f"低于{label} ({level})"
+            break
+        if i == len(sorted_levels) - 1 and current_price > level:
+            zone = f"高于{label} ({level})"
+            break
+        if i < len(sorted_levels) - 1:
+            next_label, next_level = sorted_levels[i + 1]
+            if current_price >= level and current_price < next_level:
+                zone = f"{label}~{next_label} ({level}-{next_level})"
+                break
+    
+    return {
+        'high': round(high, 2),
+        'low': round(low, 2),
+        'trend': 'uptrend' if uptrend else 'downtrend',
+        'levels': levels,
+        'current_zone': zone,
+    }
+
+
 if __name__ == '__main__':
     # Quick test
     df = fetch_intraday_data('AAPL')
