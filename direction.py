@@ -31,6 +31,7 @@ class DirectionResult:
     right_signal: str = ""   # 适合右侧/不适合
     direction: str = ""      # 建议方向: '左侧', '右侧', '观望'
     buy_limit: str = ""      # 挂单建议
+    take_profit: str = ""    # 止盈建议
     stop_loss: str = ""      # 止损建议
     details: dict = field(default_factory=dict)
     error: Optional[str] = None
@@ -235,7 +236,7 @@ def analyze_direction(ticker: str) -> DirectionResult:
         
         # ─── 挂单建议 ──────────────────────────────────────
         if direction == '左侧':
-            # Buy limit near Fibonacci support or below current
+            # Buy limit near Fibonacci support
             fib_618 = fib_levels.get('支0.618', 0)
             fib_786 = fib_levels.get('支0.786', 0)
             bb_lower = bb.get('lower', 0)
@@ -246,22 +247,28 @@ def analyze_direction(ticker: str) -> DirectionResult:
             if bb_lower: candidates.append(('布林下轨', bb_lower))
             
             if candidates:
-                # Pick the lowest (safest) entry
                 candidates.sort(key=lambda x: x[1])
                 best_label, best_price = candidates[0]
                 result.buy_limit = f"挂单 ${best_price:.2f} ({best_label})"
-                # Stop loss below the lowest level
-                if len(candidates) > 1:
-                    sl = candidates[0][1] * 0.995
-                else:
-                    sl = best_price * 0.995
+                sl = candidates[0][1] * 0.995 if len(candidates) > 1 else best_price * 0.995
                 result.stop_loss = f"止损 ${sl:.2f} (低于{best_label} -0.5%)"
             else:
                 result.buy_limit = "等待RSI<30或触及支撑"
                 result.stop_loss = "自定止损 -2%"
+            
+            # TP: Fib retracement or R1
+            for key in ['支0.382', '支0.500']:
+                if key in fib_levels and fib_levels[key] > current_price:
+                    tp = fib_levels[key]
+                    result.take_profit = f"止盈 ${tp:.2f} ({key}, +{(tp-current_price)/current_price*100:.1f}%)"
+                    break
+            if not result.take_profit and sr.get('resistance1', 0) > current_price:
+                tp = sr['resistance1']
+                result.take_profit = f"止盈 ${tp:.2f} (R1, +{(tp-current_price)/current_price*100:.1f}%)"
+            if not result.take_profit:
+                result.take_profit = f"止盈 ${current_price*1.03:.2f} (+3%目标)"
         
         elif direction == '右侧':
-            # Buy at pullback to VWAP or EMA
             ema5 = trend.get('ema5', 0)
             buy_price = 0
             buy_label = ""
@@ -271,13 +278,13 @@ def analyze_direction(ticker: str) -> DirectionResult:
             elif ema5 > 0:
                 buy_price = ema5
                 buy_label = "EMA5回调"
-            
+        
             if buy_price > 0 and buy_price < current_price:
                 result.buy_limit = f"挂单 ${buy_price:.2f} ({buy_label})"
             else:
                 result.buy_limit = f"现价入场 ${current_price:.2f}"
-            
-            # Stop loss below EMA20 or support
+        
+            sl = 0
             ema20 = trend.get('ema20', 0)
             s1 = sr.get('support1', 0)
             sl = max(ema20, s1) if ema20 and s1 else (ema20 or s1)
@@ -287,10 +294,22 @@ def analyze_direction(ticker: str) -> DirectionResult:
             else:
                 result.stop_loss = f"止损 ${current_price * 0.985:.2f} (-1.5%)"
         
+            # TP: Fibonacci extension or resistance
+            for key in ['延1.272', '延1.618']:
+                if key in fib_levels and fib_levels[key] > current_price:
+                    tp = fib_levels[key]
+                    result.take_profit = f"止盈 ${tp:.2f} ({key}, +{(tp-current_price)/current_price*100:.1f}%)"
+                    break
+            if not result.take_profit and sr.get('resistance1', 0) > current_price:
+                tp = sr['resistance1']
+                result.take_profit = f"止盈 ${tp:.2f} (R1, +{(tp-current_price)/current_price*100:.1f}%)"
+            if not result.take_profit:
+                result.take_profit = f"止盈 ${current_price*1.02:.2f} (+2%目标)"
         else:
             result.buy_limit = "等待明确信号"
             result.stop_loss = "-"
-        
+            result.take_profit = "-"
+
         # Store details for display
         result.details = {
             'rsi': rsi,
@@ -354,6 +373,8 @@ def format_direction_result(r: DirectionResult) -> str:
     # Order suggestions
     lines.append(f"💰 **挂单建议**")
     lines.append(f"   入场: {r.buy_limit}")
+    if r.take_profit:
+        lines.append(f"   止盈: {r.take_profit}")
     lines.append(f"   止损: {r.stop_loss}")
     lines.append("")
     
