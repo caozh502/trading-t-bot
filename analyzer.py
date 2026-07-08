@@ -9,6 +9,12 @@ from dataclasses import dataclass, field
 from typing import Optional
 import yfinance as yf
 
+# Fix SSL cert issue in Railway/cloud environments
+import ssl, certifi, os
+os.environ.setdefault('SSL_CERT_FILE', certifi.where())
+os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
+ssl._create_default_https_context = ssl.create_default_context(cafile=certifi.where())
+
 from direction import analyze_direction, format_direction_result as _
 
 from indicators import (
