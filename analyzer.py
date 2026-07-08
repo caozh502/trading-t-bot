@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 import yfinance as yf
 
+from direction import analyze_direction, format_direction_result as _
+
 from indicators import (
     fetch_intraday_data, fetch_current_price, calc_session_vwap, calc_rsi, detect_trend,
     calc_support_resistance, calc_volume_ratio, calc_bollinger_bands,
@@ -54,6 +56,14 @@ class AnalysisResult:
     bollinger: dict = field(default_factory=dict)
     sl_tp: dict = field(default_factory=dict)  # stop-loss & take-profit
     market_session: str = ""  # 盘前 | 盘中 | 盘后 | 休市
+    # Direction analysis (long-side 做T + left/right/short)
+    left_score: int = 0
+    right_score: int = 0
+    short_score: int = 0
+    direction_advice: str = ""
+    dir_entry: str = ""
+    dir_target: str = ""
+    dir_stop: str = ""
     error: Optional[str] = None
 
 
@@ -482,6 +492,20 @@ def analyze_ticker(ticker: str) -> AnalysisResult:
             total, ticker=result.ticker
         )
         
+        # 9. Direction analysis (left/right/short)
+        try:
+            dir_r = analyze_direction(ticker)
+            if not dir_r.error:
+                result.left_score = dir_r.left_score
+                result.right_score = dir_r.right_score
+                result.short_score = dir_r.short_score
+                result.direction_advice = dir_r.direction
+                result.dir_entry = dir_r.buy_limit
+                result.dir_target = dir_r.take_profit
+                result.dir_stop = dir_r.stop_loss
+        except Exception:
+            pass
+        
     except Exception as e:
         logger.error(f"Error analyzing {ticker}: {e}")
         result.error = f"分析异常: {str(e)[:100]}"
@@ -571,6 +595,15 @@ def format_result(result: AnalysisResult, verbose: bool = True) -> str:
         lines.append(f"   止损: **${sl['sl_price']:.2f}** ({sl['sl_pct']:+.2f}%) ← {sl['sl_basis']}")
         lines.append(f"   止盈: **${sl['tp_price']:.2f}** ({sl['tp_pct']:+.2f}%) → {sl['tp_basis']}")
         lines.append(f"   盈亏比: {rr}:1 {rr_icon}")
+    
+    # Direction analysis (left/right/short)
+    if result.left_score or result.right_score or result.short_score:
+        dir_emoji = "🔵" if result.direction_advice == '左侧' else "🔴" if result.direction_advice == '右侧' else "⚫" if result.direction_advice == '做空' else "⚪"
+        lines.append("")
+        lines.append(f"📊 **方向评分** — 建议: {dir_emoji} {result.direction_advice}")
+        lines.append(f"   🔵 左侧(抄底): {result.left_score}/100  🔴 右侧(追势): {result.right_score}/100  ⚫ 做空: {result.short_score}/100")
+        if result.dir_entry or result.dir_target or result.dir_stop:
+            lines.append(f"   📌 计划: {result.dir_entry} | {result.dir_target} | {result.dir_stop}")
     
     return "\n".join(lines)
 

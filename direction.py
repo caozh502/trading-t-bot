@@ -28,6 +28,7 @@ class DirectionResult:
     change_pct: float = 0.0
     left_score: int = 0      # 左侧评分 0-100
     right_score: int = 0     # 右侧评分 0-100
+    short_score: int = 0     # 做空评分 0-100
     left_signal: str = ""    # 适合左侧/不适合
     right_signal: str = ""   # 适合右侧/不适合
     direction: str = ""      # 建议方向: '左侧', '右侧', '观望'
@@ -212,32 +213,85 @@ def analyze_direction(ticker: str) -> DirectionResult:
         right = min(100, right)
         right_factors.sort(key=lambda x: x[1], reverse=True)
         
-        # ─── Determine direction ────────────────────────────
-        diff = right - left
-        if left >= 55 and left > right:
+        # ─── 做空评分 (Short-side) ──────────────────────────
+        short = 0
+        short_factors = []
+        
+        # Bearish trend
+        if trend.get('direction') == 'bearish':
+            short += 25
+            short_factors.append(("空头趋势", 25, ""))
+        
+        # RSI overbought
+        if rsi and rsi > 75:
+            short += 20
+            short_factors.append(("RSI超买", 20, f"RSI={rsi}"))
+        elif rsi and rsi > 65:
+            short += 10
+            short_factors.append(("RSI偏强", 10, f"RSI={rsi}"))
+        
+        # MACD bearish
+        if macd.get('cross') == 'bearish':
+            short += 15
+            short_factors.append(("MACD死叉", 15, ""))
+        elif macd.get('macd', 0) < macd.get('signal', 0):
+            short += 8
+            short_factors.append(("MACD空头", 8, ""))
+        
+        # Price below VWAP
+        if vwap > 0 and current_price < vwap:
+            short += 15
+            short_factors.append(("VWAP下方", 15, f"${vwap}"))
+        
+        # Near resistance
+        r1 = sr.get('resistance1', 0)
+        if r1 > 0:
+            dist_r1 = (r1 - current_price) / current_price * 100
+            if 0 < dist_r1 < 0.5:
+                short += 10
+                short_factors.append(("贴近阻力R1", 10, f"${r1}"))
+        
+        # Below EMAs
+        if not trend.get('above_ema5', True) and not trend.get('above_ema20', True):
+            short += 5
+            short_factors.append(("EMA下方", 5, ""))
+        
+        short = min(100, short)
+        short_factors.sort(key=lambda x: x[1], reverse=True)
+        
+        result.short_score = short
+
+        # ─── Determine direction (left/right/short) ─────────
+        signal_left = "⚪ 不适合左侧"
+        signal_right = "⚪ 不适合右侧"
+        signal_short = "⚪ 不适合做空"
+        scores = [('左侧', left, 0), ('右侧', right, 1), ('做空', short, 2)]
+        scores.sort(key=lambda x: x[1], reverse=True)
+        best_name, best_score, _ = scores[0]
+        
+        if short >= 55 and short > max(left, right):
+            direction = '做空'
+            signal_short = "✅ 适合做空"
+        elif left >= 55 and left > right and left > short:
             direction = '左侧'
             signal_left = "✅ 适合左侧入场"
             signal_right = "❌ 不适合右侧"
-        elif right >= 55 and right > left:
+            signal_short = "❌ 不适合做空"
+        elif right >= 55 and right > left and right > short:
             direction = '右侧'
             signal_right = "✅ 适合右侧入场"
             signal_left = "❌ 不适合左侧"
-        elif left >= 40 and right < 40:
-            direction = '左侧'
-            signal_left = "🟡 可考虑左侧"
-            signal_right = "❌ 不适合右侧"
-        elif right >= 40 and left < 40:
-            direction = '右侧'
-            signal_right = "🟡 可考虑右侧"
-            signal_left = "❌ 不适合左侧"
-        elif abs(diff) < 15:
+            signal_short = "❌ 不适合做空"
+        elif abs(left - right) < 15 and max(left, right) < 40 and short < 40:
             direction = '观望'
             signal_left = "⚪ 信号不明确"
             signal_right = "⚪ 信号不明确"
+            signal_short = "⚪ 信号不明确"
         else:
-            direction = '右侧' if diff > 0 else '左侧'
-            signal_right = "可考虑右侧" if diff > 0 else "不推荐右侧"
-            signal_left = "可考虑左侧" if diff < 0 else "不推荐左侧"
+            if short >= max(left, right) and short >= 35:
+                direction = '做空'
+            else:
+                direction = best_name if best_score >= 30 else '观望'
         
         result.left_score = left
         result.right_score = right
@@ -316,6 +370,27 @@ def analyze_direction(ticker: str) -> DirectionResult:
                 result.take_profit = f"止盈 ${tp:.2f} (R1, +{(tp-current_price)/current_price*100:.1f}%)"
             if not result.take_profit:
                 result.take_profit = f"止盈 ${current_price*1.02:.2f} (+2%目标)"
+        
+        elif direction == '做空':
+            # Entry: near resistance level
+            r1 = sr.get('resistance1', 0)
+            if r1 > 0 and r1 > current_price:
+                result.buy_limit = f"挂空 ${r1:.2f} (R1反弹)"
+            else:
+                result.buy_limit = f"现价做空 ${current_price:.2f}"
+            
+            # Stop loss: above resistance or R2
+            r2 = sr.get('resistance2', 0)
+            sl = r2 if r2 > current_price else current_price * 1.01
+            result.stop_loss = f"止损 ${sl:.2f} (+{(sl-current_price)/current_price*100:.1f}%)"
+            
+            # Take profit: at support or fixed target
+            s1 = sr.get('support1', 0)
+            if s1 > 0 and s1 < current_price:
+                result.take_profit = f"止盈 ${s1:.2f} (S1, -{(current_price-s1)/current_price*100:.1f}%)"
+            else:
+                result.take_profit = f"止盈 ${current_price*0.98:.2f} (-2%目标)"
+        
         else:
             result.buy_limit = "等待明确信号"
             result.stop_loss = "-"

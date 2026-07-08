@@ -23,7 +23,6 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from analyzer import analyze_ticker, analyze_multiple, format_result
-from direction import analyze_direction, format_direction_result as format_dir
 from config import (
     TELEGRAM_BOT_TOKEN, DEFAULT_WATCHLIST, VERBOSE_DEFAULT
 )
@@ -265,27 +264,6 @@ async def cmd_spy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(f"❌ 获取大盘数据出错: {str(e)[:200]}")
 
 
-async def cmd_side(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Analyze left-side vs right-side entry. Usage: /side NVDA"""
-    if not context.args:
-        await update.message.reply_text(
-            "⚠️ 请输入股票代码，例如: `/side NVDA`",
-            parse_mode="Markdown"
-        )
-        return
-
-    ticker = context.args[0].upper().strip()
-    msg = await update.message.reply_text(f"🔍 正在分析 **{ticker}** 方向...", parse_mode="Markdown")
-
-    try:
-        result = analyze_direction(ticker)
-        output = format_dir(result)
-        await msg.edit_text(output, parse_mode="Markdown")
-    except Exception as e:
-        logger.error(f"Error in /side command: {e}")
-        await msg.edit_text(f"❌ 分析出错: {str(e)[:200]}")
-
-
 async def cmd_strategy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show trading strategy reference."""
     await update.message.reply_text(
@@ -368,8 +346,6 @@ def main():
     app.add_handler(CommandHandler("t", cmd_t))
     app.add_handler(CommandHandler("watchlist", cmd_watchlist))
     app.add_handler(CommandHandler("spy", cmd_spy))
-    app.add_handler(CommandHandler("side", cmd_side))
-    app.add_handler(CommandHandler("s", cmd_side))
     app.add_handler(CommandHandler("strategy", cmd_strategy))
     app.add_handler(CommandHandler("menu", cmd_menu))
     app.add_handler(CommandHandler("stop", cmd_stop))
