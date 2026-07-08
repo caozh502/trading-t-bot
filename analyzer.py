@@ -616,6 +616,10 @@ def format_result(result: AnalysisResult, verbose: bool = True) -> str:
         if result.dir_entry or result.dir_target or result.dir_stop:
             lines.append(f"   📌 计划: {result.dir_entry} | {result.dir_target} | {result.dir_stop}")
     
+    # ── One-line action summary ────────────────────────────────
+    lines.append("")
+    lines.append(_action_summary(result))
+    
     return "\n".join(lines)
 
 
@@ -627,6 +631,41 @@ def _score_bar(score: float, width: int = 10) -> str:
         return "🟢" + "█" * filled + "░" * empty
     else:
         return "🔴" + "█" * filled + "░" * empty
+
+
+def _action_summary(r) -> str:
+    """Generate a one-line action summary."""
+    ts = r.total_score
+    s = r.signal
+    d = r.direction_advice
+    sl = r.sl_tp or {}
+    entry = r.dir_entry or ""
+    sl_price = sl.get('sl_price', 0)
+    tp_price = sl.get('tp_price', 0)
+    
+    # Strong signals
+    if ts >= 0.4 and d in ('左侧', '右侧'):
+        if entry:
+            return f"💡 **建议**: 按计划{d}入场 — {entry}，破止损({sl_price})走"
+        return f"💡 **建议**: {s}，执行做T计划，止损${sl_price}"
+    
+    if d == '做空':
+        return f"💡 **建议**: ⚠️ 适合做空，挂单等反弹到阻力位入场"
+    
+    # Moderate
+    if ts >= 0.2:
+        if d == '左侧':
+            return f"💡 **建议**: 挂单等回调 — {entry}"
+        return f"💡 **建议**: 等回调再入，追高风险大"
+    
+    if d in ('左侧', '右侧') and (r.left_score >= 40 or r.right_score >= 40):
+        return f"💡 **建议**: 评分偏低，先观望，等信号明确再入场"
+    
+    # Neutral / poor
+    if r.left_score >= 40 or r.right_score >= 40:
+        return f"💡 **建议**: 当前做T评分偏低，方向有待确认，建议观望"
+    
+    return f"💡 **建议**: 评分{s.strip()}，不适合操作，等更好的机会"
 
 
 if __name__ == '__main__':
