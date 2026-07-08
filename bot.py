@@ -17,6 +17,7 @@ import logging
 import os
 import sys
 import signal
+import threading
 from datetime import datetime, timezone
 
 from telegram import Update
@@ -310,6 +311,29 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
 
 
+# ── Health server for Railway ────────────────────────────────
+
+def _start_health_server():
+    """Start a minimal HTTP server for Railway health check."""
+    port = int(os.environ.get("PORT", 8080))
+    try:
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        class HealthHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"ok")
+            def log_message(self, *a): pass
+        
+        server = HTTPServer(("0.0.0.0", port), HealthHandler)
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        logger.info(f"✅ Health server started on port {port}")
+    except Exception as e:
+        logger.warning(f"Health server not started (non-critical): {e}")
+
+
 # ── Main ─────────────────────────────────────────────────────
 
 def main():
@@ -352,6 +376,9 @@ def main():
     app.add_error_handler(error_handler)
     
     logger.info("✅ Bot started! Commands: /t <ticker>, /watchlist, /spy, /strategy, /menu, /stop")
+    
+    # Start a lightweight HTTP server for Railway health check
+    _start_health_server()
     
     # Start polling
     app.run_polling(allowed_updates=Update.ALL_TYPES)
