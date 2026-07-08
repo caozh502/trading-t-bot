@@ -11,13 +11,16 @@ import logging
 import requests
 
 # Global session using requests (SSL disabled for Railway compatibility)
+import os
+os.environ['PYTHONHTTPSVERIFY'] = '0'
+
 _session = requests.Session()
 _session.verify = False
 _session.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 })
 import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+urllib3.disable_warnings()
 
 def get_session():
     return _session

@@ -2,6 +2,10 @@
 Railway entry point — start health server first, then bot.
 """
 import os, sys, threading
+
+# SSL: disable verification for Railway BEFORE any other imports
+os.environ['PYTHONHTTPSVERIFY'] = '0'
+
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Start health server IMMEDIATELY so Railway sees port binding
