@@ -445,7 +445,7 @@ def format_direction_result(r: DirectionResult) -> str:
     # Key indicators
     d = r.details
     lines.append(f"📈 **关键指标**")
-    lines.append(f"   RSI(14): {d.get('rsi', 'N/A')}  |  MACD: {d.get('macd', {}).get('cross', 'N/A')}")
+    lines.append(f"   RSI(14): {d.get('rsi', 'N/A')}  |  MACD: {_macd_status(d.get('macd', {}))}")
     lines.append(f"   趋势: {d.get('trend', {}).get('description', 'N/A')}")
     lines.append(f"   布林位置: {d.get('bb', {}).get('position', 'N/A')}%")
     lines.append(f"   量比: {d.get('vol_ratio', 'N/A')}x")
@@ -498,6 +498,38 @@ def _bar(score: int, max_score: int = 100, width: int = 10) -> str:
     else:
         color = "🔴"
     return color + "█" * filled + "░" * empty
+
+
+def _macd_status(m: dict) -> str:
+    """Human-readable MACD status."""
+    if not m:
+        return "N/A"
+    cross = m.get('cross', 'none')
+    macd = m.get('macd', 0)
+    signal = m.get('signal', 0)
+    hist = m.get('histogram', 0)
+    hist_dir = m.get('histogram_dir', '')
+    
+    if cross == 'bullish':
+        return "📈 金叉"
+    elif cross == 'bearish':
+        return "📉 死叉"
+    elif macd > signal:
+        if hist > 0 and hist_dir == 'rising':
+            return "📈 多头↑"
+        elif hist > 0:
+            return "📈 多头"
+        else:
+            return "↗ 多头减弱"
+    elif macd < signal:
+        if hist < 0 and hist_dir == 'falling':
+            return "📉 空头↓"
+        elif hist < 0:
+            return "📉 空头"
+        else:
+            return "↘ 空头减弱"
+    else:
+        return "➖ 粘合"
 
 
 if __name__ == '__main__':
