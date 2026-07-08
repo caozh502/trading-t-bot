@@ -9,12 +9,25 @@ from dataclasses import dataclass, field
 from typing import Optional
 import yfinance as yf
 
+# Force yfinance to use requests instead of curl_cffi (SSL issues in Railway)
+try:
+    yf._CURL_CFFI = False
+except Exception:
+    pass
+try:
+    import yfinance.utils
+    yfinance.utils.CURL_CFFI = False
+except Exception:
+    pass
+
 # Fix SSL cert issue in Railway/cloud environments (graceful fallback)
 try:
     import ssl, certifi, os
-    os.environ.setdefault('SSL_CERT_FILE', certifi.where())
-    os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
-    ssl._create_default_https_context = ssl.create_default_context(cafile=certifi.where())
+    ca_path = certifi.where()
+    os.environ['SSL_CERT_FILE'] = ca_path
+    os.environ['REQUESTS_CA_BUNDLE'] = ca_path
+    os.environ['CURL_CA_BUNDLE'] = ca_path
+    ssl._create_default_https_context = ssl.create_default_context(cafile=ca_path)
 except Exception:
     pass
 
