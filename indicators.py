@@ -9,14 +9,12 @@ import yfinance as yf
 from datetime import datetime, timedelta, timezone
 import logging
 import requests
-import certifi
 
-# Global session using requests (not curl_cffi) for Railway compatibility
-_get_session = requests.Session()
-_get_session.verify = certifi.where()
+# Global session using requests (requests handles its own SSL)
+_session = requests.Session()
 
 def get_session():
-    return _get_session
+    return _session
 
 logger = logging.getLogger(__name__)
 
