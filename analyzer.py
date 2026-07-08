@@ -3,33 +3,22 @@ Multi-factor scoring engine for intraday trading (做T) entry decisions.
 Combines technical indicators into a weighted score with clear signals.
 """
 
+# SSL fix: set env vars BEFORE any yfinance/libcurl import
+import os, sys
+try:
+    import certifi
+    ca = certifi.where()
+    os.environ['SSL_CERT_FILE'] = ca
+    os.environ['REQUESTS_CA_BUNDLE'] = ca
+    os.environ['CURL_CA_BUNDLE'] = ca
+except Exception:
+    pass
+
 from datetime import datetime, timezone
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
 import yfinance as yf
-
-# Force yfinance to use requests instead of curl_cffi (SSL issues in Railway)
-try:
-    yf._CURL_CFFI = False
-except Exception:
-    pass
-try:
-    import yfinance.utils
-    yfinance.utils.CURL_CFFI = False
-except Exception:
-    pass
-
-# Fix SSL cert issue in Railway/cloud environments (graceful fallback)
-try:
-    import ssl, certifi, os
-    ca_path = certifi.where()
-    os.environ['SSL_CERT_FILE'] = ca_path
-    os.environ['REQUESTS_CA_BUNDLE'] = ca_path
-    os.environ['CURL_CA_BUNDLE'] = ca_path
-    ssl._create_default_https_context = ssl.create_default_context(cafile=ca_path)
-except Exception:
-    pass
 
 from direction import analyze_direction, format_direction_result as _
 
