@@ -13,7 +13,7 @@ from indicators import (
     fetch_intraday_data, fetch_current_price, calc_rsi, detect_trend, calc_macd,
     calc_fibonacci_levels, calc_bollinger_bands, calc_session_vwap,
     calc_volume_ratio, calc_support_resistance, get_market_sentiment,
-    detect_market_session
+    detect_market_session, get_session
 )
 from config import TICKER_PARAMS
 
@@ -48,7 +48,7 @@ def analyze_direction(ticker: str) -> DirectionResult:
     result = DirectionResult(ticker=ticker.upper())
     
     try:
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(ticker, session=get_session())
         info = t.info or {}
         result.company_name = str(info.get('shortName') or info.get('longName') or '')
         result.current_price = round(info.get('currentPrice') or info.get('regularMarketPrice') or 0, 2)

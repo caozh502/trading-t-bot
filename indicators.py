@@ -8,6 +8,15 @@ import numpy as np
 import yfinance as yf
 from datetime import datetime, timedelta, timezone
 import logging
+import requests
+import certifi
+
+# Global session using requests (not curl_cffi) for Railway compatibility
+_get_session = requests.Session()
+_get_session.verify = certifi.where()
+
+def get_session():
+    return _get_session
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +35,7 @@ def fetch_intraday_data(ticker: str, interval: str = "5m", period: str = "5d") -
     """
     try:
         # For 1m data, max period is 7d; for 5m, max is 60d
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(ticker, session=get_session())
         df = t.history(period=period, interval=interval)
         if df.empty:
             logger.warning(f"No data returned for {ticker} ({interval}/{period})")
@@ -46,7 +55,7 @@ def fetch_current_price(ticker: str) -> dict:
     import yfinance as yf
     result = {"price": 0, "change_pct": 0, "source": ""}
     try:
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(ticker, session=get_session())
         # Try with extended hours first
         df = t.history(period="2d", interval="5m", prepost=True)
         if df.empty:

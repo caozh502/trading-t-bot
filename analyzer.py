@@ -25,7 +25,7 @@ from direction import analyze_direction, format_direction_result as _
 from indicators import (
     fetch_intraday_data, fetch_current_price, calc_session_vwap, calc_rsi, detect_trend,
     calc_support_resistance, calc_volume_ratio, calc_bollinger_bands,
-    get_market_sentiment, detect_market_session
+    get_market_sentiment, detect_market_session, get_session
 )
 from config import TICKER_PARAMS, DEFAULT_SL_PCT, DEFAULT_TP_PCT
 
@@ -413,7 +413,7 @@ def analyze_ticker(ticker: str) -> AnalysisResult:
     
     try:
         # 1. Fetch ticker info (company name, current price)
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(ticker, session=get_session())
         info = t.info or {}
         result.company_name = str(info.get('shortName') or info.get('longName') or '')
         result.current_price = round(info.get('currentPrice') or info.get('regularMarketPrice') or 0, 2)
