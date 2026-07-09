@@ -1,65 +1,71 @@
-# 美股做T信号分析 Bot
+<p align="center">
+  <a href="README.zh.md">[CN] Chinese</a>
+  |
+  <a href="README.md">[EN] English</a>
+</p>
 
-Telegram Bot 用于快速判断美股是否适合日内做T入场。
+# Trading Signal Bot
 
-## 功能
+Telegram bot for US stock intraday signal analysis. Multi-dimensional scoring for entry timing assessment.
 
-| 命令 | 说明 |
-|------|------|
-| `/t <代码>` | 分析单只股票 |
-| `/watchlist` | 扫描所有自选股 |
-| `/spy` | 大盘情绪 (SPY+QQQ) |
-| `/help` | 帮助信息 |
+[GitHub](https://github.com/caozh502/trading-t-bot)
 
-## 快速开始
+## Commands
 
-### 1. 安装依赖
+| Command | Description |
+|---------|-------------|
+| `/t <ticker>` | Analyze a single stock |
+| `/watchlist` | Scan all watchlist stocks |
+| `/spy` | Market sentiment (SPY+QQQ) |
+| `/help` | Help information |
 
+## Quick Start
+
+### 1. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 配置 Bot Token
-
+### 2. Configure Bot Token
 ```bash
 cp .env.example .env
-# 编辑 .env，填入你的 TG_BOT_TOKEN
+# Edit .env, fill in your TG_BOT_TOKEN
 ```
+Create a bot via [@BotFather](https://t.me/BotFather) to get a token.
 
-从 [@BotFather](https://t.me/BotFather) 创建 bot 获取 token。
-
-### 3. 运行
-
+### 3. Run
 ```bash
 python bot.py
 ```
 
-### 4. 本地测试（不用 Telegram）
-
+### 4. Local test (no Telegram needed)
 ```bash
 python run.py AAPL
 python run.py NVDA
 ```
 
-## 评分维度
+## Scoring Dimensions
 
-| 维度 | 权重 | 说明 |
-|------|------|------|
-| VWAP位置 | 25% | 价格相对VWAP的位置 |
-| 短期趋势 | 25% | 5EMA/20EMA 多空排列 |
-| RSI(14) | 20% | 超买超卖判断 |
-| 成交量 | 15% | 放量/缩量确认 |
-| 价位位置 | 15% | 支撑阻力附近 |
+| Dimension | Weight | Description |
+|-----------|--------|-------------|
+| VWAP Position | 25% | Price relative to VWAP |
+| Short-term Trend | 25% | 5EMA/20EMA bullish/bearish alignment |
+| RSI(14) | 20% | Overbought/oversold |
+| Volume | 15% | Volume confirmation |
+| Price Level | 15% | Near support/resistance |
 
-**评分逻辑**: -1.0 ~ +1.0
-- ≥ +0.5 → ✅ 适合入场
-- +0.2 ~ +0.5 → 🟡 谨慎入场
-- -0.2 ~ +0.2 → ⚪ 观望
-- ≤ -0.5 → 🔴 强烈回避
+**Score range**: -1.0 ~ +1.0
+- >= +0.5 -> Good entry
+- +0.2 ~ +0.5 -> Cautious entry
+- -0.2 ~ +0.2 -> Wait and see
+- <= -0.5 -> Strongly avoid
 
-## 自定义
+## Customization
 
-编辑 `config.py`:
-- `DEFAULT_WATCHLIST` — 你的自选股
-- `WEIGHTS` — 各维度权重
-- `SIGNAL_THRESHOLDS` — 信号阈值
+Edit `config.py`:
+- `DEFAULT_WATCHLIST` - your watchlist
+- `WEIGHTS` - dimension weights
+- `SIGNAL_THRESHOLDS` - signal thresholds
+
+---
+_Trading Signal Bot - [GitHub](https://github.com/caozh502/trading-t-bot)_
