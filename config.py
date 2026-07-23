@@ -55,11 +55,11 @@ INDICATOR_PARAMS = {
 # ── Default watchlist (your key stocks) ───────────────────────
 # Edit this list to match your portfolio / focus stocks
 DEFAULT_WATCHLIST = [
-    "MRVL",   # Marvell Technology
-    "RKLB",   # Rocket Lab
-    "NVDA",   # NVIDIA
-    "MU",     # Micron Technology
-    "QQQ",    # Nasdaq ETF
+    "RKLB",   # Rocket Lab — 太空/航空, 高波动
+    "NVDA",   # NVIDIA — AI半导体, 流动性最大
+    "SMCI",   # Super Micro — AI服务器, 高波动+低价
+    "PLTR",   # Palantir — 软件/国防, 合理波动
+    "TSLA",   # Tesla — 消费/EV, 不同板块
 ]
 
 # ── Intraday data params ──────────────────────────────────────
