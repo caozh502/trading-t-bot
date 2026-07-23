@@ -550,6 +550,29 @@ def detect_market_session(df=None) -> str:
         return ""
 
 
+def calc_atr(df: pd.DataFrame, period: int = 14) -> float:
+    """
+    Calculate Average True Range (ATR) for volatility-based position sizing.
+    ATR = rolling mean of True Range over N periods.
+    True Range = max(High-Low, |High-PrevClose|, |Low-PrevClose|)
+    """
+    if df.empty or len(df) < period + 1:
+        return 0.0
+
+    high = df['High']
+    low = df['Low']
+    close = df['Close']
+
+    tr = pd.concat([
+        high - low,
+        (high - close.shift()).abs(),
+        (low - close.shift()).abs()
+    ], axis=1).max(axis=1)
+
+    atr = tr.rolling(window=period).mean().iloc[-1]
+    return round(atr, 2)
+
+
 if __name__ == '__main__':
     # Quick test
     df = fetch_intraday_data('AAPL')

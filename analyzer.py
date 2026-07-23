@@ -25,7 +25,8 @@ from direction import analyze_direction, format_direction_result as _
 from indicators import (
     fetch_intraday_data, fetch_current_price, calc_session_vwap, calc_rsi, detect_trend,
     calc_support_resistance, calc_volume_ratio, calc_bollinger_bands,
-    get_market_sentiment, detect_market_session, get_session
+    get_market_sentiment, detect_market_session, get_session,
+    calc_macd, calc_atr,
 )
 from config import TICKER_PARAMS, DEFAULT_SL_PCT, DEFAULT_TP_PCT
 
@@ -33,11 +34,13 @@ logger = logging.getLogger(__name__)
 
 # ── Scoring weights ──────────────────────────────────────────────
 WEIGHTS = {
-    'vwap': 0.25,
-    'trend': 0.25,
-    'rsi': 0.20,
-    'volume': 0.15,
-    'price_level': 0.15,
+    'vwap': 0.20,
+    'trend': 0.20,
+    'rsi': 0.15,
+    'volume': 0.10,
+    'price_level': 0.10,
+    'macd': 0.15,
+    'bollinger': 0.10,
 }
 
 
@@ -147,14 +150,13 @@ def score_rsi(rsi_value: float) -> FactorScore:
         score = 0.0
         detail = f"↗ 偏强 ({rsi_value}) - 注意超买"
     elif rsi_value < 80:
-        # Overbought - avoid long entry
-        score = -0.5
+        # Overbought — symmetric penalty vs oversold reward
+        score = -0.8
         detail = f"🔺 超买区 ({rsi_value}) - 不适合追多"
     else:
-        # Deep overbought
-        score = -0.8
+        score = -1.0
         detail = f"⚠️ 深度超买 ({rsi_value}) - 警惕回调"
-    
+
     return FactorScore('RSI(14)', round(score, 2), WEIGHTS['rsi'], detail, str(rsi_value))
 
 
@@ -224,12 +226,82 @@ def score_price_level(current_price: float, sr: dict) -> FactorScore:
     return FactorScore('价位位置', round(score, 2), WEIGHTS['price_level'], detail_str, value_str)
 
 
+def score_bollinger(current_price: float, bb: dict, trend_direction: str) -> FactorScore:
+    """Score based on Bollinger Band position relative to trend direction."""
+    position = bb.get('position', 0.5)
+    upper = bb.get('upper', 0)
+    lower = bb.get('lower', 0)
+    middle = bb.get('middle', 0)
+
+    if upper == 0 or lower == 0:
+        return FactorScore('布林带', 0, WEIGHTS['bollinger'], '数据不足', '-')
+
+    uptrend = trend_direction == 'bullish'
+
+    if position < 0.2 and uptrend:
+        price_to_lower = (current_price - lower) / current_price * 100
+        score = 0.8
+        detail = f"⬇ 下轨({lower}) + 上升趋势 → 回归买入"
+    elif position < 0.2:
+        score = 0.4
+        detail = f"⬇ 触及下轨({lower})"
+    elif position > 0.8 and not uptrend:
+        score = -0.7
+        detail = f"⬆ 上轨({upper}) + 下降趋势 → 回归卖出"
+    elif position > 0.8:
+        score = -0.4
+        detail = f"⬆ 接近上轨({upper}) - 注意回调"
+    elif 0.4 <= position <= 0.6:
+        score = 0.2
+        detail = f"➖ 中轨({middle})附近"
+    else:
+        score = 0.0
+        detail = f"➖ 中轨偏{'上' if position > 0.6 else '下'}({position*100:.0f}%)"
+
+    return FactorScore('布林带', round(score, 2), WEIGHTS['bollinger'], detail,
+                       f"上{upper}/中{middle}/下{lower}")
+
+
+def score_macd(macd_data: dict) -> FactorScore:
+    """Score based on MACD cross and histogram direction."""
+    cross = macd_data.get('cross', 'none')
+    hist_dir = macd_data.get('histogram_dir', '')
+    macd_val = macd_data.get('macd', 0)
+    signal_val = macd_data.get('signal', 0)
+
+    if cross == 'bullish':
+        score = 0.8
+        detail = "📈 MACD金叉 — 趋势反转看多"
+    elif cross == 'bearish':
+        score = -0.8
+        detail = "📉 MACD死叉 — 趋势反转看空"
+    elif hist_dir == 'rising' and macd_val > signal_val:
+        score = 0.3
+        detail = "↗ MACD柱上升 — 多头动能增强"
+    elif hist_dir == 'falling' and macd_val < signal_val:
+        score = -0.3
+        detail = "↘ MACD柱下降 — 空头动能增强"
+    elif macd_val > signal_val:
+        score = 0.2
+        detail = "↗ MACD在Signal线上方"
+    elif macd_val < signal_val:
+        score = -0.2
+        detail = "↘ MACD在Signal线下方"
+    else:
+        score = 0.0
+        detail = "➖ MACD无明确信号"
+
+    return FactorScore('MACD', round(score, 2), WEIGHTS['macd'], detail,
+                       f"MACD={macd_val:.2f} Signal={signal_val:.2f}")
+
+
 def calc_sl_tp(current_price: float, vwap: float, sr: dict, bb: dict,
                trend_direction: str, total_score: float,
-               ticker: str = "") -> dict:
+               ticker: str = "", atr: float = 0.0) -> dict:
     """
     Calculate suggested stop-loss and take-profit levels for 做T.
     Uses per-ticker optimized params from config when available.
+    Falls back to ATR-based dynamic sizing for volatility-aware stops.
     
     Returns dict with:
         direction: 'long' or 'short'
@@ -265,14 +337,19 @@ def calc_sl_tp(current_price: float, vwap: float, sr: dict, bb: dict,
         if vwap > 0 and current_price > vwap:
             sl_candidates.append(('VWAP下方', round(vwap * 0.997, 2)))
         
-        # Method 3: Below EMA5 (if in uptrend)
+        # Method 3: ATR-based stop (volatility-aware)
+        if atr > 0:
+            atr_sl = round(current_price - 1.5 * atr, 2)
+            sl_candidates.append((f'ATR止损(1.5x)', atr_sl))
+        
+        # Method 4: Below EMA5 (if in uptrend)
         # (we'll use a fixed 0.7% fallback)
         
-        # Method 4: Below lower BB
+        # Method 5: Below lower BB
         if bb_lower > 0:
             sl_candidates.append(('布林下轨', round(bb_lower * 0.998, 2)))
         
-        # Method 5: Fixed % stop (always available)
+        # Method 6: Fixed % stop (always available)
         sl_pct_fixed = sl_default
         sl_candidates.append((f'固定止损-{sl_pct_fixed:.1f}%', round(current_price * (1 - sl_pct_fixed / 100), 2)))
         
