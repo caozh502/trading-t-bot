@@ -4,12 +4,55 @@ Produces a markdown summary of win rate, PnL, streaks, per-stock breakdown.
 
 Usage: python report.py [--days 30] [--out reports/summary_YYYYMMDD.md]
 """
-import os, sys, argparse, json
+import os, sys, argparse, json, logging
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import db
 from tracker_config import REPORT_DIR, EXPERIMENT_DAYS
+
+# Telegram (reuse trading-t-bot env)
+TG_TOKEN = ""
+TG_CHAT = ""
+for env_path in ("~/trading-t-bot/.env", "~/portfolio-monitor/.env"):
+    p = os.path.expanduser(env_path)
+    if os.path.exists(p):
+        for line in open(p):
+            line = line.strip()
+            if line.startswith("TG_BOT_TOKEN="):
+                TG_TOKEN = line.split("=", 1)[1].strip().strip('"').strip("'")
+            elif line.startswith("TG_CHAT_ID="):
+                TG_CHAT = line.split("=", 1)[1].strip().strip('"').strip("'")
+
+def send_telegram(text: str):
+    if not TG_TOKEN or not TG_CHAT:
+        return False
+    try:
+        import requests
+        r = requests.post(
+            f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+            json={"chat_id": TG_CHAT, "text": text, "parse_mode": "HTML"},
+            timeout=10)
+        return r.status_code == 200
+    except Exception as e:
+        logging.warning(f"telegram send failed: {e}")
+        return False
+
+def send_telegram_document(path: str, caption: str = ""):
+    if not TG_TOKEN or not TG_CHAT:
+        return False
+    try:
+        import requests
+        with open(path, "rb") as f:
+            r = requests.post(
+                f"https://api.telegram.org/bot{TG_TOKEN}/sendDocument",
+                data={"chat_id": TG_CHAT, "caption": caption},
+                files={"document": (os.path.basename(path), f)},
+                timeout=15)
+        return r.status_code == 200
+    except Exception as e:
+        logging.warning(f"telegram document send failed: {e}")
+        return False
 
 
 def generate_markdown(stats: dict, rows: list, days: int) -> str:
@@ -115,6 +158,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=EXPERIMENT_DAYS)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--notify", action="store_true",
+                    help="push report summary + file to Telegram after writing")
     args = ap.parse_args()
 
     db.init_db()
@@ -133,6 +178,20 @@ def main():
 
     print(f"Report written: {out}")
     print(md)
+
+    if args.notify:
+        final = "📊 <b>30天实验总结报告已生成</b>" if "summary_final" in out else "📊 <b>信号追踪日报</b>"
+        lines = [
+            final,
+            f"信号: {stats['total_signals']}笔 · 胜率: {stats['win_rate']*100:.1f}%",
+            f"平均盈利: +{stats['avg_win']:.2f}% · 平均亏损: {stats['avg_loss']:.2f}%",
+            f"累计收益(等额): <b>{stats['total_pnl_pct']:+.2f}%</b>",
+            f"报告: {out}",
+        ]
+        ok_msg = send_telegram("\n".join(lines))
+        ok_doc = send_telegram_document(out, caption="📄 完整报告")
+        logging.info(f"telegram notify: msg={ok_msg} doc={ok_doc}")
+        print(f"[notify] telegram msg={ok_msg} doc={ok_doc}")
 
 
 if __name__ == "__main__":
