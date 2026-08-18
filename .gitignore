@@ -15,3 +15,9 @@ Thumbs.db
 # Local-only (not for Vercel)
 *.vbs
 *.bat
+
+# Signal tracker runtime artifacts
+signal-tracker/signals.db
+signal-tracker/*.log
+signal-tracker/reports/
+signal-tracker/__pycache__/

@@ -55,11 +55,11 @@ INDICATOR_PARAMS = {
 # ── Default watchlist (your key stocks) ───────────────────────
 # Edit this list to match your portfolio / focus stocks
 DEFAULT_WATCHLIST = [
-    "RKLB",   # Rocket Lab — 太空/航空, 高波动
-    "NVDA",   # NVIDIA — AI半导体, 流动性最大
-    "SMCI",   # Super Micro — AI服务器, 高波动+低价
-    "PLTR",   # Palantir — 软件/国防, 合理波动
-    "TSLA",   # Tesla — 消费/EV, 不同板块
+    "TSM",    # 台积电 — 全球半导体景气风向标 (持仓TSFA)
+    "MRVL",   # 迈威尔 — AI算力/网络芯片主线 (持仓9MW)
+    "RKLB",   # Rocket Lab — 高beta成长, 风险偏好温度计 (持仓6RJ)
+    "ASTS",   # AST SpaceMobile — 卫星通信+散户情绪 (持仓NPA)
+    "GOOGL",  # 谷歌 — 大盘科技/纳指核心权重
 ]
 
 # ── Intraday data params ──────────────────────────────────────
