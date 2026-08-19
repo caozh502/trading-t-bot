@@ -317,21 +317,22 @@ def analyze_direction(ticker: str) -> DirectionResult:
                 result.buy_limit = f"挂单 ${best_price:.2f} ({best_label})"
                 sl = candidates[0][1] * 0.995 if len(candidates) > 1 else best_price * 0.995
                 result.stop_loss = f"止损 ${sl:.2f} (低于{best_label} -0.5%)"
+                
+                # TP: Fib retracement or R1 (percentages relative to current price — CFD现价开仓)
+                for key in ['支0.382', '支0.500']:
+                    if key in fib_levels and fib_levels[key] > current_price:
+                        tp = fib_levels[key]
+                        result.take_profit = f"止盈 ${tp:.2f} ({key}, +{(tp-current_price)/current_price*100:.1f}%)"
+                        break
+                if not result.take_profit and sr.get('resistance1', 0) > current_price:
+                    tp = sr['resistance1']
+                    result.take_profit = f"止盈 ${tp:.2f} (R1, +{(tp-current_price)/current_price*100:.1f}%)"
+                if not result.take_profit:
+                    result.take_profit = f"止盈 ${current_price*1.03:.2f} (+3%目标)"
             else:
                 result.buy_limit = "等待RSI<30或触及支撑"
                 result.stop_loss = "自定止损 -2%"
-            
-            # TP: Fib retracement or R1
-            for key in ['支0.382', '支0.500']:
-                if key in fib_levels and fib_levels[key] > current_price:
-                    tp = fib_levels[key]
-                    result.take_profit = f"止盈 ${tp:.2f} ({key}, +{(tp-current_price)/current_price*100:.1f}%)"
-                    break
-            if not result.take_profit and sr.get('resistance1', 0) > current_price:
-                tp = sr['resistance1']
-                result.take_profit = f"止盈 ${tp:.2f} (R1, +{(tp-current_price)/current_price*100:.1f}%)"
-            if not result.take_profit:
-                result.take_profit = f"止盈 ${current_price*1.03:.2f} (+3%目标)"
+                result.take_profit = "自定止盈 +3%"
         
         elif direction == '右侧':
             ema5 = trend.get('ema5', 0)
@@ -359,7 +360,7 @@ def analyze_direction(ticker: str) -> DirectionResult:
             else:
                 result.stop_loss = f"止损 ${current_price * 0.985:.2f} (-1.5%)"
         
-            # TP: Fibonacci extension or resistance
+            # TP: Fibonacci extension or resistance (percentages relative to current price — CFD现价开仓)
             for key in ['延1.272', '延1.618']:
                 if key in fib_levels and fib_levels[key] > current_price:
                     tp = fib_levels[key]
@@ -372,22 +373,33 @@ def analyze_direction(ticker: str) -> DirectionResult:
                 result.take_profit = f"止盈 ${current_price*1.02:.2f} (+2%目标)"
         
         elif direction == '做空':
-            # Entry: near resistance level
+            # Entry: CFD现价开仓 — percentages all relative to current price
             r1 = sr.get('resistance1', 0)
             if r1 > 0 and r1 > current_price:
-                result.buy_limit = f"挂空 ${r1:.2f} (R1反弹)"
+                result.buy_limit = f"现价做空 ${current_price:.2f} (挂空更优: R1 ${r1:.2f})"
             else:
                 result.buy_limit = f"现价做空 ${current_price:.2f}"
             
-            # Stop loss: above resistance or R2
+            # Stop loss: above resistance, capped at +5% from current price (CFD)
             r2 = sr.get('resistance2', 0)
-            sl = r2 if r2 > current_price else current_price * 1.01
-            result.stop_loss = f"止损 ${sl:.2f} (+{(sl-current_price)/current_price*100:.1f}%)"
+            if r2 > 0 and r2 > current_price:
+                sl = r2
+            else:
+                sl = current_price * 1.01
+            max_sl = current_price * 1.05
+            if sl > max_sl:
+                sl = max_sl
+                sl_basis = "R2过远, 止损上限5%"
+            else:
+                sl_basis = "R2上方" if (r2 > 0 and r2 > current_price) else "固定1%"
+            sl_pct = (sl - current_price) / current_price * 100
+            result.stop_loss = f"止损 ${sl:.2f} (+{sl_pct:.1f}%) ← {sl_basis}"
             
-            # Take profit: at support or fixed target
+            # Take profit: at support or fixed target (relative to current price)
             s1 = sr.get('support1', 0)
             if s1 > 0 and s1 < current_price:
-                result.take_profit = f"止盈 ${s1:.2f} (S1, -{(current_price-s1)/current_price*100:.1f}%)"
+                tp_pct = (current_price - s1) / current_price * 100
+                result.take_profit = f"止盈 ${s1:.2f} (S1, -{tp_pct:.1f}%)"
             else:
                 result.take_profit = f"止盈 ${current_price*0.98:.2f} (-2%目标)"
         

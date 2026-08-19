@@ -723,7 +723,7 @@ def _action_summary(r) -> str:
     
     if d == '做空':
         sl_txt = f"，止损${sl_price}" if sl_price else ""
-        return f"💡 **建议**: ⚠️ 适合做空，挂单等反弹到阻力位入场{sl_txt}"
+        return f"💡 **建议**: ⚠️ 适合做空，现价入场{sl_txt}"
     
     # Moderate
     if ts >= 0.2:
