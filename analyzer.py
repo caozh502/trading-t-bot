@@ -672,26 +672,20 @@ def format_result(result: AnalysisResult, verbose: bool = True) -> str:
         lines.append(f"   上轨 ${bb['upper']} | 中轨 ${bb['middle']} | 下轨 ${bb['lower']}")
         lines.append(f"   带宽 {bb['bandwidth']}% | 价格在 {bb_signal} ({(bb_pos*100):.0f}%位置)")
     
-    # Stop-Loss / Take-Profit
-    if result.sl_tp:
-        sl = result.sl_tp
-        dir_emoji = "📈" if sl['direction'] == 'long' else "📉" if sl['direction'] == 'short' else "➖"
-        rr = sl['rr_ratio']
-        rr_icon = "⭐" if rr >= 2.0 else "👍" if rr >= 1.5 else "👌"
-        lines.append("")
-        lines.append(f"🎯 **做T计划** {dir_emoji}")
-        lines.append(f"   止损: **${sl['sl_price']:.2f}** ({sl['sl_pct']:+.2f}%) ← {sl['sl_basis']}")
-        lines.append(f"   止盈: **${sl['tp_price']:.2f}** ({sl['tp_pct']:+.2f}%) → {sl['tp_basis']}")
-        lines.append(f"   盈亏比: {rr}:1 {rr_icon}")
-    
-    # Direction analysis (left/right/short)
+    # Direction analysis (left/right/short) — unified plan output
     if result.left_score or result.right_score or result.short_score:
         dir_emoji = "🔵" if result.direction_advice == '左侧' else "🔴" if result.direction_advice == '右侧' else "⚫" if result.direction_advice == '做空' else "⚪"
         lines.append("")
         lines.append(f"📊 **方向评分** — 建议: {dir_emoji} {result.direction_advice}")
         lines.append(f"   🔵 左侧(抄底): {result.left_score}/100  🔴 右侧(追势): {result.right_score}/100  ⚫ 做空: {result.short_score}/100")
-        if result.dir_entry or result.dir_target or result.dir_stop:
-            lines.append(f"   📌 计划: {result.dir_entry} | {result.dir_target} | {result.dir_stop}")
+        if result.dir_entry or result.dir_stop or result.dir_target:
+            lines.append(f"   📌 **计划**:")
+            if result.dir_entry:
+                lines.append(f"     入场: {result.dir_entry}")
+            if result.dir_stop:
+                lines.append(f"     止损: {result.dir_stop}")
+            if result.dir_target:
+                lines.append(f"     止盈: {result.dir_target}")
     
     # ── One-line action summary ────────────────────────────────
     lines.append("")
@@ -715,10 +709,11 @@ def _action_summary(r) -> str:
     ts = r.total_score
     s = r.signal
     d = r.direction_advice
-    sl = r.sl_tp or {}
     entry = r.dir_entry or ""
-    sl_price = sl.get('sl_price', 0)
-    tp_price = sl.get('tp_price', 0)
+    # Parse stop price from direction plan (e.g. "止损 $919.12 (低于布林下轨 -0.5%)")
+    import re
+    m = re.search(r'\$([\d.]+)', r.dir_stop or "")
+    sl_price = float(m.group(1)) if m else 0
     
     # Strong signals
     if ts >= 0.4 and d in ('左侧', '右侧'):
@@ -727,7 +722,8 @@ def _action_summary(r) -> str:
         return f"💡 **建议**: {s}，执行做T计划，止损${sl_price}"
     
     if d == '做空':
-        return f"💡 **建议**: ⚠️ 适合做空，挂单等反弹到阻力位入场"
+        sl_txt = f"，止损${sl_price}" if sl_price else ""
+        return f"💡 **建议**: ⚠️ 适合做空，挂单等反弹到阻力位入场{sl_txt}"
     
     # Moderate
     if ts >= 0.2:
